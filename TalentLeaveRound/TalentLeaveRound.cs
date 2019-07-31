@@ -6,14 +6,14 @@ using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
-
+using Newtonsoft.Json;
 
 namespace TalentLeaveRound
 {
     public static class TalentLeaveRound
     {
         [FunctionName("TalentLeaveRound")]
-        public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)]HttpRequestMessage req, TraceWriter log)
+        public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)]HttpRequestMessage req, TraceWriter log)
         {
             log.Info("C# HTTP trigger function processed a request.");
             //JObject talentreq = null;
@@ -27,7 +27,7 @@ namespace TalentLeaveRound
             if (amount > 0)
             {
                 responseMessage = req.CreateResponse(HttpStatusCode.OK);
-                responseMessage.Content = new StringContent($"The passed amount is : {amount.ToString()}", System.Text.Encoding.UTF8, "application/json");
+                responseMessage.Content = new StringContent(JsonConvert.SerializeObject(amount), System.Text.Encoding.UTF8, "application/json");
             }
             return amount <= 0
                 ? req.CreateResponse(HttpStatusCode.BadRequest, "Not a valid request")

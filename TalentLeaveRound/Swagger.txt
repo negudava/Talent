@@ -1,0 +1,42 @@
+﻿swagger: '2.0'
+info:
+  title: Talent Round API
+  version: 1.0.0
+host: talentappext.azurewebsites.net
+basePath: /
+schemes:
+  - https
+  - http
+paths:
+  /api/TalentLeaveRound:
+    post:
+      operationId: /api/TalentLeaveRound/post
+      produces:
+       - application/json
+      consumes:
+       - application/json
+      parameters: 
+      - in: body
+        name: user
+        description: The user to create.
+        schema:
+          type: object
+          required:
+            - Amount
+          properties:
+            Amount:
+              type: string
+      description: >-
+        Replace with Operation Object
+        #http://swagger.io/specification/#operationObject
+      responses:
+        '200':
+          description: Success operation
+      security:
+        - apikeyQuery: []
+definitions: {}
+securityDefinitions:
+  apikeyQuery:
+    type: apiKey
+    name: code
+    in: query
