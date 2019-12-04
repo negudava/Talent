@@ -1,0 +1,561 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "office365_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "office36510"
+    },
+    "office365_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "sa@axsolutionsarchitecture.com"
+    },
+    "azureblob_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "azureblob-6"
+    },
+    "azureblob_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "talentexport"
+    },
+    "azureblob_1_accountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the storage account the connector should use."
+      },
+      "defaultValue": "talentexport"
+    },
+    "azureblob_1_accessKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Specify a valid primary/secondary storage account access key."
+      }
+    },
+    "dynamicsax_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "dynamicsax-2"
+    },
+    "dynamicsax_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "sa@axsolutionsarchitecture.com"
+    },
+    "dynamicsax_1_environment": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment id"
+      }
+    },
+    "dynamicsax_2_Connection_Name": {
+      "type": "string",
+      "defaultValue": "dynamicsax-1"
+    },
+    "dynamicsax_2_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "sa@axsolutionsarchitecture.com"
+    },
+    "dynamicsax_2_environment": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment id"
+      }
+    },
+    "dynamicsax_3_Connection_Name": {
+      "type": "string",
+      "defaultValue": "dynamicsax-4"
+    },
+    "dynamicsax_3_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "sa@axsolutionsarchitecture.com"
+    },
+    "dynamicsax_3_environment": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment id"
+      }
+    },
+    "LogicAppLocation": {
+      "type": "string",
+      "minLength": 1,
+      "allowedValues": [
+        "[resourceGroup().location]",
+        "eastasia",
+        "southeastasia",
+        "centralus",
+        "eastus",
+        "eastus2",
+        "westus",
+        "northcentralus",
+        "southcentralus",
+        "northeurope",
+        "westeurope",
+        "japanwest",
+        "japaneast",
+        "brazilsouth",
+        "australiaeast",
+        "australiasoutheast",
+        "southindia",
+        "centralindia",
+        "westindia",
+        "canadacentral",
+        "canadaeast",
+        "uksouth",
+        "ukwest",
+        "westcentralus",
+        "westus2",
+        "koreacentral",
+        "koreasouth",
+        "francecentral",
+        "francesouth",
+        "southafricanorth",
+        "southafricawest"
+      ],
+      "defaultValue": "westus2"
+    },
+    "LogicAppName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "Importfo2"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "Add_file_to_D365_Blob_storage": {
+              "type": "Scope",
+              "actions": {
+                "Get_Azure_Writable_Url_with_Retry": {
+                  "type": "Until",
+                  "expression": "@equals(actions('Get_Azure_Writable_Url').Status, 'Succeeded')",
+                  "limit": {
+                    "count": "@parameters('retry_policy_count')",
+                    "timeout": "PT1M "
+                  },
+                  "actions": {
+                    "Get_Azure_Writable_Url": {
+                      "runAfter": {},
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "body": {
+                          "uniqueFileName": "@{encodeURIComponent(encodeURIComponent(triggerBody()?['Name']))}"
+                        },
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['dynamicsax']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "path": "@concat('/datasets/', encodeURIComponent(encodeURIComponent(parameters('dynamicsax_instance'))),'/procedures/', encodeURIComponent(encodeURIComponent('DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetAzureWriteUrl')))"
+                      }
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Get_blob_content": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azureblob_2']['connectionId']"
+                      }
+                    },
+                    "method": "get",
+                    "path": "/datasets/default/files/@{encodeURIComponent(encodeURIComponent(triggerBody()?['Path']))}/content",
+                    "queries": {
+                      "inferContentType": true
+                    }
+                  },
+                  "runAfter": {
+                    "Get_Azure_Writable_Url_with_Retry": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Upload_to_D365_for_Operations_Azure_blob_storage_with_retry": {
+                  "type": "Until",
+                  "expression": "@equals(actions('Upload_to_D365_Azure_Blob_Storage').Status, 'Succeeded')",
+                  "limit": {
+                    "count": "@parameters('retry_policy_count')",
+                    "timeout": "PT1M"
+                  },
+                  "actions": {
+                    "Upload_to_D365_Azure_Blob_Storage": {
+                      "type": "Http",
+                      "inputs": {
+                        "method": "PUT",
+                        "uri": "@json(body('Get_Azure_Writable_Url')?['value']).BlobUrl",
+                        "headers": {
+                          "Content-Type": "application/octet-stream",
+                          "x-ms-blob-type": "BlockBlob",
+                          "x-ms-version": "2015-02-21",
+                          "�x-ms-date": "@utcnow('R')"
+                        },
+                        "body": "@body('Get_blob_content')"
+                      },
+                      "runAfter": {}
+                    }
+                  },
+                  "runAfter": {
+                    "Get_blob_content": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {}
+            },
+            "Check_execution_status": {
+              "type": "Scope",
+              "actions": {
+                "Check_status_until_import_is_complete": {
+                  "type": "Until",
+                  "expression": "@contains(body('Get_execution_summary_status')?['value'], 'Succeeded')",
+                  "limit": {
+                    "count": "@parameters('retry_policy_count')",
+                    "timeout": "PT1M"
+                  },
+                  "actions": {
+                    "Delay": {
+                      "type": "Wait",
+                      "inputs": {
+                        "interval": {
+                          "count": 10,
+                          "unit": "Second"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Get_execution_summary_status": {
+                      "runAfter": {
+                        "Delay": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "body": {
+                          "executionId": "@{body('Initiate_package_import')?['value']}"
+                        },
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['dynamicsax_1']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "path": "@concat('/datasets/', encodeURIComponent(encodeURIComponent(parameters('dynamicsax_instance'))),'/procedures/', encodeURIComponent(encodeURIComponent('DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetExecutionSummaryStatus')))"
+                      }
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "runAfter": {
+                "Initiate_package_import_in_D365_for_Operations": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Handle_exceptions": {
+              "type": "Scope",
+              "actions": {
+                "Create_blob": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azureblob_2']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "body": "@body('Get_blob_content')",
+                    "path": "/datasets/default/files",
+                    "queries": {
+                      "folderPath": "/exception",
+                      "name": "Exception file",
+                      "queryParametersSingleEncoded": true
+                    }
+                  },
+                  "runAfter": {
+                    "Send_an_email": [
+                      "Succeeded"
+                    ]
+                  },
+                  "runtimeConfiguration": {
+                    "contentTransfer": {
+                      "transferMode": "Chunked"
+                    }
+                  }
+                },
+                "Delete_blob": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azureblob_2']['connectionId']"
+                      }
+                    },
+                    "method": "delete",
+                    "path": "/datasets/default/files/@{encodeURIComponent(encodeURIComponent('/fdimensionsexport'))}"
+                  },
+                  "runAfter": {
+                    "Create_blob": [
+                      "Succeeded"
+                    ]
+                  },
+                  "metadata": {
+                    "JTJmbmVlbGltYWxvZ2ljYXBwJTJmRXhwb3J0K0ZpbGU=": "/neelimalogicapp/Export File"
+                  }
+                },
+                "Send_an_email": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['office365']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "body": {
+                      "To": "@parameters('exception_email_id')",
+                      "Subject": "Exception has occurred while processing file ",
+                      "Body": "Exception has occurred while processing file"
+                    },
+                    "path": "/Mail"
+                  },
+                  "runAfter": {}
+                }
+              },
+              "runAfter": {
+                "Add_file_to_D365_Blob_storage": [
+                  "Failed",
+                  "Skipped",
+                  "TimedOut"
+                ],
+                "Check_execution_status": [
+                  "Failed",
+                  "Skipped",
+                  "TimedOut"
+                ],
+                "Initiate_package_import_in_D365_for_Operations": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Initiate_package_import_in_D365_for_Operations": {
+              "type": "Scope",
+              "actions": {
+                "Until": {
+                  "type": "Until",
+                  "expression": "@equals(actions('Initiate_package_import').Status, 'Succeeded')",
+                  "limit": {
+                    "count": "@parameters('retry_policy_count')",
+                    "timeout": "PT1M"
+                  },
+                  "actions": {
+                    "Initiate_package_import": {
+                      "runAfter": {},
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "body": {
+                          "definitionGroupId": "FDUpdate",
+                          "execute": true,
+                          "legalEntityId": "DAT",
+                          "overwrite": true,
+                          "packageUrl": "@json(body('Get_Azure_Writable_Url')?['value']).BlobUrl"
+                        },
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['dynamicsax_2']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "path": "@concat('/datasets/', encodeURIComponent(encodeURIComponent(parameters('dynamicsax_instance'))),'/procedures/', encodeURIComponent(encodeURIComponent('DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.ImportFromPackage')))"
+                      }
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "runAfter": {
+                "Add_file_to_D365_Blob_storage": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            },
+            "dynamicsax_instance": {
+              "defaultValue": "d365labdidevaos.sandbox.ax.dynamics.com",
+              "type": "String"
+            },
+            "exception_email_id": {
+              "defaultValue": "",
+              "type": "String"
+            },
+            "retry_policy_count": {
+              "defaultValue": 2,
+              "type": "Int"
+            }
+          },
+          "triggers": {
+            "When_a_blob_is_added_or_modified_(properties_only)": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azureblob_2']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/datasets/default/triggers/batch/onupdatedfile",
+                "queries": {
+                  "folderId": "JTJmZmluYW5jaWFsZGltZW5zaW9ucw==",
+                  "maxFileCount": 1
+                }
+              },
+              "recurrence": {
+                "frequency": "Minute",
+                "interval": 1
+              },
+              "metadata": {
+                "JTJmZmRpbWVuc2lvbnNleHBvcnQ=": "/fdimensionsexport",
+                "JTJmZmluYW5jaWFsZGltZW5zaW9ucw==": "/financialdimensions",
+                "JTJmbmVlbGltYWxvZ2ljYXBw": "/neelimalogicapp"
+              },
+              "splitOn": "@triggerBody()"
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "dynamicsax": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'dynamicsax')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_1_Connection_Name'))]",
+                "connectionName": "[parameters('dynamicsax_1_Connection_Name')]"
+              },
+              "azureblob_2": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'azureblob')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('azureblob_1_Connection_Name'))]",
+                "connectionName": "[parameters('azureblob_1_Connection_Name')]"
+              },
+              "dynamicsax_1": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'dynamicsax')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_2_Connection_Name'))]",
+                "connectionName": "[parameters('dynamicsax_2_Connection_Name')]"
+              },
+              "office365": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'office365')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('office365_1_Connection_Name'))]",
+                "connectionName": "[parameters('office365_1_Connection_Name')]"
+              },
+              "dynamicsax_2": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'dynamicsax')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_3_Connection_Name'))]",
+                "connectionName": "[parameters('dynamicsax_3_Connection_Name')]"
+              }
+            }
+          }
+        }
+      },
+      "name": "[parameters('LogicAppName')]",
+      "type": "Microsoft.Logic/workflows",
+      "location": "[parameters('LogicAppLocation')]",
+      "apiVersion": "2016-06-01",
+      "tags": {
+        "displayName": "LogicApp"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_1_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('azureblob_1_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_2_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('office365_1_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_3_Connection_Name'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('office365_1_Connection_Name')]",
+      "location": "westus2",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'office365')]"
+        },
+        "displayName": "[parameters('office365_1_Connection_DisplayName')]"
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('azureblob_1_Connection_Name')]",
+      "location": "westus2",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'azureblob')]"
+        },
+        "displayName": "[parameters('azureblob_1_Connection_DisplayName')]",
+        "parameterValues": {
+          "accountName": "[parameters('azureblob_1_accountName')]",
+          "accessKey": "[parameters('azureblob_1_accessKey')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('dynamicsax_1_Connection_Name')]",
+      "location": "westus2",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'dynamicsax')]"
+        },
+        "displayName": "[parameters('dynamicsax_1_Connection_DisplayName')]",
+        "nonSecretParameterValues": {
+          "environment": "[parameters('dynamicsax_1_environment')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('dynamicsax_2_Connection_Name')]",
+      "location": "westus2",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'dynamicsax')]"
+        },
+        "displayName": "[parameters('dynamicsax_2_Connection_DisplayName')]",
+        "nonSecretParameterValues": {
+          "environment": "[parameters('dynamicsax_2_environment')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('dynamicsax_3_Connection_Name')]",
+      "location": "westus2",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'westus2', '/managedApis/', 'dynamicsax')]"
+        },
+        "displayName": "[parameters('dynamicsax_3_Connection_DisplayName')]",
+        "nonSecretParameterValues": {
+          "environment": "[parameters('dynamicsax_3_environment')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
