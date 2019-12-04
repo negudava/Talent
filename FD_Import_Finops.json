@@ -1,0 +1,442 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "dynamicsax_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "dynamicsax"
+    },
+    "dynamicsax_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "sa@axsolutionsarchitecture.com"
+    },
+    "azureblob_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "azureblob"
+    },
+    "azureblob_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "talentexport"
+    },
+    "azureblob_1_accountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the storage account the connector should use."
+      },
+      "defaultValue": "talentexport"
+    },
+    "azureblob_1_accessKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Specify a valid primary/secondary storage account access key."
+      }
+    },
+    "webcontents_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "webcontents-1"
+    },
+    "webcontents_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "https://aos-rts-sf-550e5c091f6-prod-westus2.hr.talent.dynamics.com"
+    },
+    "webcontents_1_token:ResourceUri": {
+      "type": "string",
+      "metadata": {
+        "description": "The identifier used in Azure AD to identify the target resource. For SharePoint Online and OneDrive for Business, use https://{contoso}.sharepoint.com. Usually, it is the base URL of your resource."
+      },
+      "defaultValue": "http://hr.talent.dynamics.com"
+    },
+    "webcontents_1_baseResourceUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Specify the base URL of the HTTP resources you want to connect to.  You can connect to any resources under this URL."
+      },
+      "defaultValue": "https://aos-rts-sf-550e5c091f6-prod-westus2.hr.talent.dynamics.com"
+    },
+    "webcontents_2_Connection_Name": {
+      "type": "string",
+      "defaultValue": "webcontents"
+    },
+    "webcontents_2_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "https://aos-rts-sf-550e5c091f6-prod-westus2.hr.talent.dynamics.com"
+    },
+    "webcontents_2_token:ResourceUri": {
+      "type": "string",
+      "metadata": {
+        "description": "The identifier used in Azure AD to identify the target resource. For SharePoint Online and OneDrive for Business, use https://{contoso}.sharepoint.com. Usually, it is the base URL of your resource."
+      },
+      "defaultValue": "http://hr.talent.dynamics.com"
+    },
+    "webcontents_2_baseResourceUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Specify the base URL of the HTTP resources you want to connect to.  You can connect to any resources under this URL."
+      },
+      "defaultValue": "https://aos-rts-sf-550e5c091f6-prod-westus2.hr.talent.dynamics.com"
+    },
+    "LogicAppLocation": {
+      "type": "string",
+      "minLength": 1,
+      "allowedValues": [
+        "[resourceGroup().location]",
+        "eastasia",
+        "southeastasia",
+        "centralus",
+        "eastus",
+        "eastus2",
+        "westus",
+        "northcentralus",
+        "southcentralus",
+        "northeurope",
+        "westeurope",
+        "japanwest",
+        "japaneast",
+        "brazilsouth",
+        "australiaeast",
+        "australiasoutheast",
+        "southindia",
+        "centralindia",
+        "westindia",
+        "canadacentral",
+        "canadaeast",
+        "uksouth",
+        "ukwest",
+        "westcentralus",
+        "westus2",
+        "koreacentral",
+        "koreasouth",
+        "francecentral",
+        "francesouth",
+        "southafricanorth",
+        "southafricawest"
+      ],
+      "defaultValue": "eastus"
+    },
+    "LogicAppName": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "Talentexportbasedonevent"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "Create_blob": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azureblob']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "body": "@body('HTTP')",
+                "path": "/datasets/default/files",
+                "queries": {
+                  "folderPath": "/financialdimensions",
+                  "name": "dimensionsexport",
+                  "queryParametersSingleEncoded": true
+                }
+              },
+              "runAfter": {
+                "HTTP": [
+                  "Succeeded"
+                ]
+              },
+              "runtimeConfiguration": {
+                "contentTransfer": {
+                  "transferMode": "Chunked"
+                }
+              }
+            },
+            "HTTP": {
+              "type": "Http",
+              "inputs": {
+                "method": "GET",
+                "uri": "@{body('Invoke_an_HTTP_request_3')['value']}"
+              },
+              "runAfter": {
+                "Invoke_an_HTTP_request_3": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Initialize_variable": {
+              "type": "InitializeVariable",
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "ExecutionStatus",
+                    "type": "String",
+                    "value": "unset"
+                  }
+                ]
+              },
+              "runAfter": {
+                "Invoke_an_HTTP_request": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Invoke_an_HTTP_request": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['webcontents_1']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "body": {
+                  "method": "POST",
+                  "url": "https://aos-rts-sf-550e5c091f6-prod-westus2.hr.talent.dynamics.com/namespaces/c62a9d18-0646-4558-8177-0fac4f45b3cd//data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.Financial Dimensions Export",
+                  "body": "@{base64(concat('{','\n','\"definitionGroupId\":\"Financial Dimensions Export\",','\n','\"packageName\":\"Financial Dimensions Export\",','\n','\"executionId\":\"\",','\n','\"reExecute\":false,','\n','\"legalEntityId\":\"DAT\"','\n','}','\n'))}"
+                },
+                "path": "/codeless/InvokeHttp"
+              },
+              "runAfter": {
+                "Parse_JSON": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Invoke_an_HTTP_request_3": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['webcontents']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "body": {
+                  "method": "POST",
+                  "url": "https://aos-rts-sf-550e5c091f6-prod-westus2.hr.talent.dynamics.com/namespaces/c62a9d18-0646-4558-8177-0fac4f45b3cd//data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetExportedPackageUrl",
+                  "body": "@{base64(concat('{\"executionId\":\"',body('Invoke_an_HTTP_request')['value'],'\"}'))}"
+                },
+                "path": "/codeless/InvokeHttp"
+              },
+              "runAfter": {
+                "Until": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Parse_JSON": {
+              "type": "ParseJson",
+              "inputs": {
+                "content": "@triggerBody()",
+                "schema": {
+                  "BusinessEventId": "",
+                  "ControlNumber": 0,
+                  "DataProjectName": "",
+                  "EventId": "",
+                  "EventTime": "1900-01-01T00:00:00Z",
+                  "ExecutionId": "",
+                  "LegalEntity": "",
+                  "MajorVersion": 0,
+                  "MinorVersion": 0,
+                  "Status": ""
+                }
+              },
+              "runAfter": {}
+            },
+            "Until": {
+              "type": "Until",
+              "expression": "@equals(variables('ExecutionStatus'), 'Succeeded')",
+              "limit": {
+                "count": 60,
+                "timeout": "PT1H"
+              },
+              "actions": {
+                "Delay": {
+                  "type": "Wait",
+                  "inputs": {
+                    "interval": {
+                      "count": 5,
+                      "unit": "Minute"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Invoke_an_HTTP_request_2": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['webcontents']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "body": {
+                      "method": "POST",
+                      "url": "https://aos-rts-sf-550e5c091f6-prod-westus2.hr.talent.dynamics.com/namespaces/c62a9d18-0646-4558-8177-0fac4f45b3cd//data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetExecutionSummaryStatus",
+                      "body": "@{base64(concat('{\"executionId\":\"',body('Invoke_an_HTTP_request')['value'],'\"}'))}"
+                    },
+                    "path": "/codeless/InvokeHttp"
+                  },
+                  "runAfter": {
+                    "Delay": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Set_variable": {
+                  "type": "SetVariable",
+                  "inputs": {
+                    "name": "ExecutionStatus",
+                    "value": "@{body('Invoke_an_HTTP_request_2')['value']}"
+                  },
+                  "runAfter": {
+                    "Invoke_an_HTTP_request_2": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runAfter": {
+                "Initialize_variable": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_Business_Event_occurs": {
+              "type": "ApiConnectionWebhook",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['dynamicsax']['connectionId']"
+                  }
+                },
+                "body": {
+                  "NotificationUrl": "@{listCallbackUrl()}"
+                },
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent('d365labdidevaos.sandbox.ax.dynamics.com'))}/subscribebusinessevent/@{encodeURIComponent(encodeURIComponent('DMFImportJobFinishedBusinessEvent'))}",
+                "queries": {
+                  "businesseventcategory": "Alerts",
+                  "legalEntity": "USMF"
+                }
+              }
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "azureblob": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'azureblob')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('azureblob_1_Connection_Name'))]",
+                "connectionName": "[parameters('azureblob_1_Connection_Name')]"
+              },
+              "webcontents_1": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'webcontents')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('webcontents_1_Connection_Name'))]",
+                "connectionName": "[parameters('webcontents_1_Connection_Name')]"
+              },
+              "webcontents": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'webcontents')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('webcontents_2_Connection_Name'))]",
+                "connectionName": "[parameters('webcontents_2_Connection_Name')]"
+              },
+              "dynamicsax": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'dynamicsax')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_1_Connection_Name'))]",
+                "connectionName": "[parameters('dynamicsax_1_Connection_Name')]"
+              }
+            }
+          }
+        }
+      },
+      "name": "[parameters('LogicAppName')]",
+      "type": "Microsoft.Logic/workflows",
+      "location": "[parameters('LogicAppLocation')]",
+      "tags": {
+        "displayName": "LogicApp"
+      },
+      "apiVersion": "2016-06-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('azureblob_1_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('webcontents_1_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('webcontents_2_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('dynamicsax_1_Connection_Name'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('dynamicsax_1_Connection_Name')]",
+      "location": "eastus",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'dynamicsax')]"
+        },
+        "displayName": "[parameters('dynamicsax_1_Connection_DisplayName')]"
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('azureblob_1_Connection_Name')]",
+      "location": "eastus",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'azureblob')]"
+        },
+        "displayName": "[parameters('azureblob_1_Connection_DisplayName')]",
+        "parameterValues": {
+          "accountName": "[parameters('azureblob_1_accountName')]",
+          "accessKey": "[parameters('azureblob_1_accessKey')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('webcontents_1_Connection_Name')]",
+      "location": "eastus",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'webcontents')]"
+        },
+        "displayName": "[parameters('webcontents_1_Connection_DisplayName')]",
+        "nonSecretParameterValues": {
+          "token:ResourceUri": "[parameters('webcontents_1_token:ResourceUri')]",
+          "baseResourceUrl": "[parameters('webcontents_1_baseResourceUrl')]"
+        }
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2016-06-01",
+      "name": "[parameters('webcontents_2_Connection_Name')]",
+      "location": "eastus",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', 'eastus', '/managedApis/', 'webcontents')]"
+        },
+        "displayName": "[parameters('webcontents_2_Connection_DisplayName')]",
+        "nonSecretParameterValues": {
+          "token:ResourceUri": "[parameters('webcontents_2_token:ResourceUri')]",
+          "baseResourceUrl": "[parameters('webcontents_2_baseResourceUrl')]"
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
